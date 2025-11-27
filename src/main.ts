@@ -5,11 +5,16 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  app.enableCors({ 
+    origin: 'http://localhost:3000', // ton frontend
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true,          // supprime les champs non prévus dans le DTO
-      forbidNonWhitelisted: true, // bloque les champs inattendus
-      transform: true,         // <-- transforme automatiquement "123" en 123
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
     }),
   );
 
