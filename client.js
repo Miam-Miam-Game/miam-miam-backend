@@ -1,22 +1,21 @@
 const { io } = require("socket.io-client");
 
-const socket = io("http://localhost:3000"); // URL de ton serveur NestJS
+const socket = io("http://localhost:4500");
 
-const user = "Alice";
-const user2 = "Bob";
-const room = "room1";
+socket.emit("join", { username: "Player1" });
 
-// Rejoindre la room
-socket.emit("connectionRoom", { user, room });
-socket.emit("connectionRoom", { user2, room });
-
-// Écouter les messages
-socket.on("events", (data) => {
-  console.log("Message reçu :", data);
+socket.on("waitingRoom", data => {
+  console.log("WAITING ROOM:", data);
 });
 
-// Envoyer un message après 2 secondes
-setTimeout(() => {
-  socket.emit("events", { user, room, message: "Bonjour tout le monde !" });
-  socket.emit("events", { user2, room, message: "Bonjour tout le monde ! 2" });
-}, 2000);
+socket.on("gameStart", data => {
+  console.log("GAME START:", data);
+});
+
+socket.on("timer", time => {
+  console.log("TIME LEFT:", time);
+});
+
+socket.on("gameEnd", data => {
+  console.log("GAME END:", data);
+});

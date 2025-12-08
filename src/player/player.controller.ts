@@ -36,7 +36,7 @@ export class PlayerController {
     return this.playerService.remove(id);
   }
 
-  @Delete('all')
+  @Delete()
   removeAll(): Promise<Player[]> {
     return this.playerService.removeAll();
   }
