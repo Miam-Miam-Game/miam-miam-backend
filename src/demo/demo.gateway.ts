@@ -1,9 +1,17 @@
-import { SubscribeMessage, WebSocketGateway, WebSocketServer, MessageBody, ConnectedSocket } from '@nestjs/websockets';
+import {
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+  MessageBody,
+  ConnectedSocket,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { PlayerService } from 'src/player/player.service';
+import { PlayerService } from '../player/player.service';
 
 const MAX_PLAYERS = 3;
-const GAME_DURATION = 120;
+const GAME_DURATION = 10;
+const COUNTDOWN = 5;
+const COLORS = ['red', 'blue', 'green'];
 
 interface Player {
   socketId: string;
@@ -11,13 +19,11 @@ interface Player {
   x: number;
   y: number;
   score: number;
+  color: string;
 }
 
-
 @WebSocketGateway({
-  cors: {
-    origin: '*',
-  },
+  cors: { origin: '*' },
 })
 export class DemoGateway {
   @WebSocketServer()
@@ -25,107 +31,100 @@ export class DemoGateway {
 
   constructor(private readonly playerService: PlayerService) {}
 
-  // état global du jeu
   private players: Player[] = [];
+  private cakes: { x: number; y: number }[] = [];
   private gameStarted = false;
   private timeLeft = 0;
-  private cakes: { x: number; y: number }[] = [];
   private timer: NodeJS.Timeout;
+  private countdownTimer: NodeJS.Timeout;
 
-  // méthodes @SubscribeMessage
-  @SubscribeMessage('join')
-  async handleJoin(
-    @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { username: string },
-  ) {
-    await this.playerService.create(data.username, 0);
-    if (this.gameStarted) {
-      socket.emit('gameRunning', {
-        message: 'Une partie est déjà en cours',
-      });
-      return;
-    }
-
-    if (this.players.length >= MAX_PLAYERS) {
-      socket.emit('roomFull');
-      return;
-    }
-
-    this.players.push({
-      socketId: socket.id,
-      username: data.username,
-      x: Math.floor(Math.random() * 20),
-      y: Math.floor(Math.random() * 20),
-      score: 0,
-    });
-
-    this.server.emit('waitingRoom', {
-      players: this.players.map(p => p.username),
-    });
-
-    if (this.players.length === MAX_PLAYERS) {
-      this.startCountdown();
-    }
-
+// 🟢 JOIN
+@SubscribeMessage('join')
+async handleJoin(
+  @ConnectedSocket() socket: Socket,
+  @MessageBody() data: { username: string },
+) {
+  if (this.players.length >= MAX_PLAYERS) {
+    socket.emit('roomFull');
+    return;
   }
 
-  private startCountdown() {
-  let countdown = 5;
+  await this.playerService.create(data.username, 0);
 
-  this.server.emit('countdown', countdown);
+  // ➜ On ajoute le joueur à la liste
+  const newPlayerIndex = this.players.length; // 0,1,2 → deviendra joueur 1,2,3
+  const color = COLORS[newPlayerIndex];
 
-  const interval = setInterval(() => {
-    countdown--;
-    this.server.emit('countdown', countdown);
+  const player = {
+    socketId: socket.id,
+    username: data.username,
+    x: 0,
+    y: 0,
+    score: 0,
+    color,
+  };
 
-    if (countdown === 0) {
-      clearInterval(interval);
-      this.startGame(); // ✅ lancement réel du jeu
-    }
-  }, 1000);
+  this.players.push(player);
+
+  socket.emit("playerInfo", {
+    username: data.username,
+    playerNumber: this.players.length,
+    color: COLORS[this.players.length - 1],
+  });
+
+
+  // 🟠 ➜ Aux autres : info globale (liste des joueurs)
+  this.server.emit("waitingRoom", {
+    players: this.players.map((p, i) => ({
+      num: i + 1,
+      username: p.username,
+      color: p.color,
+    })),
+  });
+
+  // ➜ si on veut garder le lancement auto du countdown
+  if (this.players.length === MAX_PLAYERS) {
+    this.startCountdown();
+  }
 }
 
 
+
+  // ⏱️ COUNTDOWN
+  private startCountdown() {
+    let value = COUNTDOWN;
+    this.server.emit('countdown', value);
+
+    this.countdownTimer = setInterval(() => {
+      value--;
+      this.server.emit('countdown', value);
+
+      if (value === 0) {
+        clearInterval(this.countdownTimer);
+        this.startGame();
+      }
+    }, 1000);
+  }
+
+  // 🎮 GAME START
   private startGame() {
     this.gameStarted = true;
     this.timeLeft = GAME_DURATION;
     this.spawnCakes();
 
-    this.server.emit('gameStart', {
+    this.server.emit('gameStart');
+    this.server.emit('gameState', {
       players: this.players,
       cakes: this.cakes,
-      timeLeft: this.timeLeft,
     });
 
     this.timer = setInterval(() => {
       this.timeLeft--;
-      this.server.emit('timer', this.timeLeft);
-
-      if (this.timeLeft <= 0) {
-        this.endGame();
-      }
+      if (this.timeLeft <= 0) this.endGame();
     }, 1000);
   }
 
-  private spawnCakes() {
-    this.cakes = [];
-
-    for (let i = 0; i < 5; i++) {
-      this.cakes.push(this.randomPosition());
-    }
-  }
-
-  private spawnSingleCake() {
-    this.cakes.push(this.randomPosition());
-  }
-
-  private randomPosition() {
-    return {
-      x: Math.floor(Math.random() * 20),
-      y: Math.floor(Math.random() * 20),
-    };
-  }
-
+  // ⌨️ MOVE
   @SubscribeMessage('move')
   handleMove(
     @ConnectedSocket() socket: Socket,
@@ -133,25 +132,15 @@ export class DemoGateway {
   ) {
     if (!this.gameStarted) return;
 
-    const player = this.players.find(p => p.socketId === socket.id);
-    if (!player) return;
+    const p = this.players.find(p => p.socketId === socket.id);
+    if (!p) return;
 
-    switch (data.direction) {
-      case 'ArrowUp':
-        player.y--;
-        break;
-      case 'ArrowDown':
-        player.y++;
-        break;
-      case 'ArrowLeft':
-        player.x--;
-        break;
-      case 'ArrowRight':
-        player.x++;
-        break;
-    }
+    if (data.direction === 'ArrowUp') p.y--;
+    if (data.direction === 'ArrowDown') p.y++;
+    if (data.direction === 'ArrowLeft') p.x--;
+    if (data.direction === 'ArrowRight') p.x++;
 
-    this.checkCakeCollision(player);
+    this.checkCollision(p);
 
     this.server.emit('gameState', {
       players: this.players,
@@ -159,34 +148,39 @@ export class DemoGateway {
     });
   }
 
-  private checkCakeCollision(player: Player) {
-    const index = this.cakes.findIndex(
-      c => c.x === player.x && c.y === player.y,
-    );
-
-    if (index !== -1) {
-      this.cakes.splice(index, 1);
-      player.score++;
-      this.spawnSingleCake();
+  // 🍰 CAKES
+  private spawnCakes() {
+    this.cakes = [];
+    for (let i = 0; i < 5; i++) {
+      this.cakes.push(this.randomPos());
     }
   }
 
+  private randomPos() {
+    return {
+      x: Math.floor(Math.random() * 20),
+      y: Math.floor(Math.random() * 20),
+    };
+  }
+
+  private checkCollision(player: Player) {
+    const i = this.cakes.findIndex(
+      c => c.x === player.x && c.y === player.y,
+    );
+    if (i !== -1) {
+      this.cakes.splice(i, 1);
+      player.score++;
+      this.cakes.push(this.randomPos());
+    }
+  }
+
+  // 🛑 END GAME
   private async endGame() {
     clearInterval(this.timer);
-
-    this.server.emit('gameEnd', {
-      results: this.players.map(p => ({
-        username: p.username,
-        score: p.score,
-      })),
-    });
-
+    this.server.emit('gameEnd');
     this.players = [];
     this.cakes = [];
     this.gameStarted = false;
     await this.playerService.removeAll();
   }
-
-
 }
-
