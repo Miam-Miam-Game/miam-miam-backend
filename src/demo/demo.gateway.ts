@@ -9,7 +9,7 @@ import { Server, Socket } from 'socket.io';
 import { PlayerService } from '../player/player.service';
 
 const MAX_PLAYERS = 3;
-const GAME_DURATION = 10;
+const GAME_DURATION = 30;
 const COUNTDOWN = 5;
 const COLORS = ['red', 'blue', 'green'];
 
@@ -135,10 +135,14 @@ async handleJoin(
     const p = this.players.find(p => p.socketId === socket.id);
     if (!p) return;
 
-    if (data.direction === 'ArrowUp') p.y--;
-    if (data.direction === 'ArrowDown') p.y++;
-    if (data.direction === 'ArrowLeft') p.x--;
-    if (data.direction === 'ArrowRight') p.x++;
+    const speed = 10;
+
+    if (data.direction === 'ArrowUp') p.y -= speed;
+    if (data.direction === 'ArrowDown') p.y += speed;
+    if (data.direction === 'ArrowLeft') p.x -= speed;
+    if (data.direction === 'ArrowRight') p.x += speed;
+
+    console.log("MOVE from", socket.id, data.direction);
 
     this.checkCollision(p);
 
