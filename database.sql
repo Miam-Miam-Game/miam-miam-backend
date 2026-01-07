@@ -64,7 +64,7 @@ ALTER SEQUENCE public."player_idPlayer_seq" OWNED BY public.player."idPlayer";
 CREATE TABLE public.record (
     "idRecord" integer NOT NULL,
     username character varying NOT NULL,
-    record integer NOT NULL
+    score integer NOT NULL
 );
 
 
@@ -119,7 +119,7 @@ COPY public.player ("idPlayer", username, score) FROM stdin;
 -- Data for Name: record; Type: TABLE DATA; Schema: public; Owner: myuser
 --
 
-COPY public.record ("idRecord", username, record) FROM stdin;
+COPY public.record ("idRecord", username, score) FROM stdin;
 \.
 
 

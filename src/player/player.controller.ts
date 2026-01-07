@@ -28,7 +28,7 @@ export class PlayerController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updatePlayerDto: UpdatePlayerDto
   ) {
-    return this.playerService.update(id, updatePlayerDto.username, updatePlayerDto.score);
+    return this.playerService.update(id, updatePlayerDto.score,updatePlayerDto.username);
   }
 
   @Delete(':id')

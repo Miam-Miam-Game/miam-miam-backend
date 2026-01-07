@@ -9,5 +9,5 @@ export class CreateRecordDto {
     @Type(() => Number)
     @IsNumber()
     @Min(0)
-    record: number;  
+    score: number;  
 }
