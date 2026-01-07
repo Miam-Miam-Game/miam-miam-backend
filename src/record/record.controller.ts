@@ -10,7 +10,7 @@ export class RecordController {
 
   @Post()
   create(@Body() createRecordDto: CreateRecordDto): Promise<Record> {
-    return this.recordService.create(createRecordDto.username, createRecordDto.record);
+    return this.recordService.create(createRecordDto.username, createRecordDto.score);
   }
 
   @Get('all')
@@ -25,7 +25,7 @@ export class RecordController {
 
   @Put(':id')
   update(@Param('id') id: string, @Body() updateRecordDto: UpdateRecordDto): Promise<Record> {
-    return this.recordService.update(+id, updateRecordDto.username, updateRecordDto.record);
+    return this.recordService.update(+id, updateRecordDto.username, updateRecordDto.score);
   }
 
   @Delete('all')

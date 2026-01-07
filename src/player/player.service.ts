@@ -44,7 +44,7 @@ export class PlayerService {
     return administrator;
   }
 
-  async update(id: number, username?: string, score?: number,): Promise<Player> {
+  async update(id: number, score?: number, username?: string): Promise<Player> {
     const player = await this.playerRepository.findOneBy({
       idPlayer: id,
     });
@@ -84,4 +84,3 @@ export class PlayerService {
   }
 
 }
-

@@ -11,40 +11,40 @@ export class RecordService {
     @InjectRepository(Record) private readonly recordRepository: Repository<Record>,
   ) {}
 
-  async create(username: string, record: number): Promise<Record> {
+  async create(username: string, score: number): Promise<Record> {
     // Créer une nouvelle entité player
     const lastRecord = await this.recordRepository.findOneBy({
-      record: record,
+      score: score,
     });
     if (lastRecord) {
       throw new NotFoundException(
-        `Record with id ${record} already exists`,
+        `Record with id ${score} already exists`,
       );
     }
 
     const newRecord = this.recordRepository.create({
       username,
-      record
+      score
     });        
 
     return this.recordRepository.save(newRecord);
   }
 
-  findAll(): Promise<Record[]> {
+  async findAll(): Promise<Record[]> {
     return this.recordRepository.find();
   }
 
   async findOne(id: number): Promise<Record> {
-    const record = await this.recordRepository.findOneBy({
+    const score = await this.recordRepository.findOneBy({
       idRecord: id,
     });
-    if (!record) {
+    if (!score) {
       throw new NotFoundException(`Record with id ${id} not found`);
     }
-    return record;
+    return score;
   }
 
-  async update(id: number, username: string, record: number): Promise<Record> {
+  async update(id: number, username: string, score: number): Promise<Record> {
     const rd = await this.recordRepository.findOneBy({
       idRecord: id,
     });
@@ -56,8 +56,8 @@ export class RecordService {
       rd.username = username;
     }
 
-    if (typeof record === 'number') {
-      rd.record = record;
+    if (typeof score === 'number') {
+      rd.score = score;
     }
 
     return this.recordRepository.save(rd);
@@ -71,15 +71,15 @@ export class RecordService {
 
   async remove(id: number): Promise<Record> {
     // Récupérer le record avant suppression
-    const record = await this.recordRepository.findOneBy({
+    const score = await this.recordRepository.findOneBy({
       idRecord: id,
     });
-    if (!record) {
+    if (!score) {
       throw new NotFoundException(`record with id ${id} not found`);
     }
     // Supprimer le record
     await this.recordRepository.delete({ idRecord: id });
 
-    return record;
+    return score;
   }
 }

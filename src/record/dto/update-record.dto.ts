@@ -6,10 +6,10 @@ import { IsString, Min, MaxLength, IsNumber } from 'class-validator';
 export class UpdateRecordDto extends PartialType(CreateRecordDto) {
     @IsString()
     @MaxLength(25)
-    username: string;  
-    
+    username: string;
+
     @Type(() => Number)
     @IsNumber()
     @Min(0)
-    record: number;      
+    score: number;
 }

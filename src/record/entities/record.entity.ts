@@ -9,5 +9,5 @@ export class Record {
   username: string;    
 
   @Column()
-  record: number;      
+  score: number;      
 }
