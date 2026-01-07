@@ -158,4 +158,3 @@ ALTER TABLE ONLY public.record
 --
 
 \unrestrict fkRS0ta4T59LvRa80tHsL6HTSPvTvZBzs1J71Gg68XluRsEZcTx5fG2NTqRD2NQ
-
