@@ -13,7 +13,7 @@ import { PlayerService } from './player/player.service';
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      url: 'postgresql://myuser:mypassword@localhost:5432/mydb',
+      url: process.env.DATABASE_URL,
       ssl: false,
       synchronize: true,
       autoLoadEntities: true,
