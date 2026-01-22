@@ -48,8 +48,15 @@ export class DemoGateway {
   @SubscribeMessage('join')
   async handleJoin(
     @ConnectedSocket() socket: Socket,
-    @MessageBody() data: { username: string },
+    @MessageBody() data: { username: string; color: string },
   ) {
+
+    if (this.isColorTaken(data.color)) {
+      socket.emit("colorError", { message: "Couleur déjà prise" });
+      return;
+    }
+
+
     if (this.players.length >= MAX_PLAYERS) {
       socket.emit('roomFull');
       return;
@@ -57,10 +64,10 @@ export class DemoGateway {
 
     const dataPlayer = await this.playerService.create(data.username, 0);
 
-
     // ➜ On ajoute le joueur à la liste
-    const newPlayerIndex = this.players.length; // 0,1,2 → deviendra joueur 1,2,3
-    const color = COLORS[newPlayerIndex];
+    // const newPlayerIndex = this.players.length; // 0,1,2 → deviendra joueur 1,2,3
+    // const color = data.color; // couleur choisie par le joueur
+
 
     const player = {
       idPlayer: dataPlayer.idPlayer,
@@ -69,7 +76,7 @@ export class DemoGateway {
       x: 0,
       y: 0,
       score: 0,
-      color,
+      color: data.color,
     };
 
     this.players.push(player);
@@ -77,7 +84,7 @@ export class DemoGateway {
     socket.emit("playerInfo", {
       username: data.username,
       playerNumber: this.players.length,
-      color: COLORS[this.players.length - 1],
+      color: data.color,
     });
 
 
@@ -88,7 +95,9 @@ export class DemoGateway {
         username: p.username,
         color: p.color,
       })),
+      takenColors: this.players.map(p => p.color)
     });
+
 
     // ➜ si on veut garder le lancement auto du countdown
     if (this.players.length === MAX_PLAYERS) {
@@ -97,7 +106,7 @@ export class DemoGateway {
   }
 
 
-  // ⏱️ COUNTDOWN
+  // COUNTDOWN
   private startCountdown() {
     let value = COUNTDOWN;
     this.server.emit('countdown', value);
@@ -113,7 +122,7 @@ export class DemoGateway {
     }, 1000);
   }
 
-  // 🎮 GAME START
+  // GAME START
   private startGame() {
     this.gameStarted = true;
     this.timeLeft = GAME_DURATION;
@@ -134,7 +143,7 @@ export class DemoGateway {
     }, 1000);
   }
 
-  // ⌨️ MOVE
+  // MOVE
   @SubscribeMessage('move')
   handleMove(
     @ConnectedSocket() socket: Socket,
@@ -147,7 +156,7 @@ export class DemoGateway {
 
     const speed = 1; // 1 case
 
-    // 🧱 COLLISIONS AVEC LES MURS
+    // COLLISIONS AVEC LES MURS
     if (data.direction === 'ArrowUp' && p.y > 0) p.y -= speed;
     if (data.direction === 'ArrowDown' && p.y < 19) p.y += speed;
     if (data.direction === 'ArrowLeft' && p.x > 0) p.x -= speed;
@@ -162,7 +171,7 @@ export class DemoGateway {
   }
 
 
-  // 🍰 CAKES
+  // CAKES
   private spawnCakes() {
     this.cakes = [];
     for (let i = 0; i < 5; i++) {
@@ -193,39 +202,54 @@ export class DemoGateway {
     }
   }
 
-  private async saveRecord(player: Player): Promise<boolean> {
-    const recordList = await this.recordService.findAll();
-    console.log("RecordList:", recordList);
-
-    // Aucun record en base
-    if (recordList.length === 0) {
-      return true;
-    }
-
-    // Trier pour être sûr de prendre le meilleur
-    const bestRecord = recordList[0];
-    console.log("BestRecord:", bestRecord);
-
-    // Nouveau record battu
-    if (player.score > bestRecord.score) {
-      return true;
-    }
-
-    return false;
+  private getTopScorers() {
+    const players = [...this.players];
+    const maxScore = Math.max(...players.map(p => p.score));
+    return players.filter(p => p.score === maxScore);
   }
 
 
+  // private async saveRecord(player: Player): Promise<boolean> {
+  //   const recordList = await this.recordService.findAll();
+  //   console.log("RecordList:", recordList);
 
-  // 🛑 END GAME
+  //   // Aucun record en base
+  //   if (recordList.length === 0) {
+  //     return true;
+  //   }
+
+  //   // Trier pour être sûr de prendre le meilleur
+  //   const bestRecord = recordList[0];
+  //   console.log("BestRecord:", bestRecord);
+
+  //   // Nouveau record battu
+  //   if (player.score > bestRecord.score) {
+  //     return true;
+  //   }
+
+  //   return false;
+  // }
+
+  private isColorTaken(color: string): boolean {
+    return this.players.some(p => p.color === color);
+  }
+
+  // END GAME
   private async endGame() {
     clearInterval(this.timer);
 
-    // 🏆 Meilleur joueur
-    const bestPlayer = [...this.players].reduce((best, p) =>
-      p.score > best.score ? p : best
-    );
+    // 1) Déterminer les gagnants (égalité possible)
+    const winners = this.getTopScorers();
+    const isTie = winners.length > 1;
 
-    // 📦 Record courant (0 ou 1)
+    console.log("WINNERS:", winners);
+    console.log("isTie:", isTie);
+
+    // 2) Le "bestPlayer" pour la logique de record
+    //    → si égalité, on prend le premier arbitrairement
+    const bestPlayer = winners[0];
+
+    // 3) Gestion du record
     const recordList = await this.recordService.findAll();
     const currentRecord: Record | null = recordList[0] ?? null;
 
@@ -234,34 +258,32 @@ export class DemoGateway {
     let bestRecord: Record;
 
     if (!currentRecord) {
-      // 🆕 Premier record
       bestRecord = await this.recordService.create(
         bestPlayer.username,
         bestPlayer.score
       );
     } else if (isRecord) {
-      // 🏆 Record battu → on garde l'ancien pour l'affichage
       bestRecord = currentRecord;
-
       await this.recordService.removeAll();
       await this.recordService.create(
         bestPlayer.username,
         bestPlayer.score
       );
     } else {
-      // ❌ Record non battu → on renvoie le record existant
       bestRecord = currentRecord;
     }
 
-    // 🔥 Envoi socket (bestRecord toujours présent)
+    // 4) Envoi socket
     this.server.emit("gameOver", {
-      bestPlayer,
+      isTie,
+      winners,        // tableau si égalité
+      bestPlayer,     
       players: this.players,
       isRecord,
       bestRecord
     });
 
-    // ⏳ Reset
+    // 5) Reset
     setTimeout(async () => {
       this.players = [];
       this.cakes = [];
@@ -269,6 +291,5 @@ export class DemoGateway {
       await this.playerService.removeAll();
     }, 15000);
   }
-
 
 }
