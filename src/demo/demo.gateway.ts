@@ -202,11 +202,18 @@ export class DemoGateway {
     }
   }
 
-  private getTopScorers() {
-    const players = [...this.players];
-    const maxScore = Math.max(...players.map(p => p.score));
-    return players.filter(p => p.score === maxScore);
+  getTopScorers() {
+    const maxScore = Math.max(...this.players.map(p => p.score));
+
+    // Aucun gagnant si tout le monde a 0
+    if (maxScore === 0) {
+      return [];
+    }
+
+    // Tous les joueurs ayant le meilleur score
+    return this.players.filter(p => p.score === maxScore);
   }
+
 
 
   // private async saveRecord(player: Player): Promise<boolean> {
@@ -238,20 +245,41 @@ export class DemoGateway {
   private async endGame() {
     clearInterval(this.timer);
 
-    // 1) Déterminer les gagnants (égalité possible)
     const winners = this.getTopScorers();
     const isTie = winners.length > 1;
+    const bestPlayer = winners[0] ?? null;
 
     console.log("WINNERS:", winners);
     console.log("isTie:", isTie);
 
-    // 2) Le "bestPlayer" pour la logique de record
-    //    → si égalité, on prend le premier arbitrairement
-    const bestPlayer = winners[0];
+    // 🟥 CAS SPÉCIAL : aucun gagnant (tout le monde a 0)
+    if (bestPlayer === null) {
+      const recordList = await this.recordService.findAll();
+      const currentRecord = recordList[0] ?? null;
 
-    // 3) Gestion du record
+      this.server.emit("gameOver", {
+        isTie: false,
+        winners: [],
+        bestPlayer: null,
+        players: this.players,
+        isRecord: false,
+        bestRecord: currentRecord   // ⬅️ ON ENVOIE LE RECORD EXISTANT
+      });
+
+      setTimeout(async () => {
+        this.players = [];
+        this.cakes = [];
+        this.gameStarted = false;
+        await this.playerService.removeAll();
+      }, 15000);
+
+      return;
+    }
+
+
+    // 🟩 Gestion du record (seulement si bestPlayer existe)
     const recordList = await this.recordService.findAll();
-    const currentRecord: Record | null = recordList[0] ?? null;
+    const currentRecord = recordList[0] ?? null;
 
     const isRecord = !currentRecord || bestPlayer.score > currentRecord.score;
 
@@ -273,17 +301,17 @@ export class DemoGateway {
       bestRecord = currentRecord;
     }
 
-    // 4) Envoi socket
+    // 🟦 Envoi normal
     this.server.emit("gameOver", {
       isTie,
-      winners,        // tableau si égalité
-      bestPlayer,     
+      winners,
+      bestPlayer,
       players: this.players,
       isRecord,
       bestRecord
     });
 
-    // 5) Reset
+    // Reset
     setTimeout(async () => {
       this.players = [];
       this.cakes = [];
@@ -291,5 +319,6 @@ export class DemoGateway {
       await this.playerService.removeAll();
     }, 15000);
   }
+
 
 }
