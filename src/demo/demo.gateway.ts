@@ -143,6 +143,57 @@ export class DemoGateway {
     }, 1000);
   }
 
+  private isCellOccupied(x: number, y: number, currentId: number): boolean {
+    return this.players.some(p => p.idPlayer !== currentId && p.x === x && p.y === y);
+  }
+
+  @SubscribeMessage('quit')
+  handleQuit(@ConnectedSocket() socket: Socket) {
+    this.handleDisconnect(socket);
+  }
+
+
+  @SubscribeMessage('disconnect')
+  handleDisconnect(@ConnectedSocket() socket: Socket) {
+    const player = this.players.find(p => p.socketId === socket.id);
+    if (!player) return;
+
+    console.log(`Player ${player.username} disconnected`);
+
+    // Retirer le joueur
+    this.players = this.players.filter(p => p.socketId !== socket.id);
+
+    // Si la partie n'a pas commencé → simple mise à jour du lobby
+    if (!this.gameStarted) {
+      this.server.emit("waitingRoom", {
+        players: this.players.map((p, i) => ({
+          num: i + 1,
+          username: p.username,
+          color: p.color,
+        })),
+        takenColors: this.players.map(p => p.color)
+      });
+      return;
+    }
+
+  // 🟥 PAUSE GLOBALE
+  clearInterval(this.timer);
+
+  this.server.emit("gamePaused", {
+    by: player.username,
+    reason: "disconnect"
+  });
+
+  // 🟧 Option : fin automatique après 10 secondes
+  setTimeout(() => {
+    if (this.gameStarted) {
+      this.endGame();
+    }
+  }, 10000);
+}
+
+
+
   // MOVE
   @SubscribeMessage('move')
   handleMove(
@@ -154,21 +205,38 @@ export class DemoGateway {
     const p = this.players.find(p => p.socketId === socket.id);
     if (!p) return;
 
-    const speed = 1; // 1 case
+    const speed = 1;
 
-    // COLLISIONS AVEC LES MURS
-    if (data.direction === 'ArrowUp' && p.y > 0) p.y -= speed;
-    if (data.direction === 'ArrowDown' && p.y < 19) p.y += speed;
-    if (data.direction === 'ArrowLeft' && p.x > 0) p.x -= speed;
-    if (data.direction === 'ArrowRight' && p.x < 19) p.x += speed;
+    // Position actuelle
+    let newX = p.x;
+    let newY = p.y;
 
+    // Tentative de mouvement
+    if (data.direction === 'ArrowUp' && p.y > 0) newY -= speed;
+    if (data.direction === 'ArrowDown' && p.y < 19) newY += speed;
+    if (data.direction === 'ArrowLeft' && p.x > 0) newX -= speed;
+    if (data.direction === 'ArrowRight' && p.x < 19) newX += speed;
+
+    // 🔥 Collision avec un autre joueur
+    if (this.isCellOccupied(newX, newY, p.idPlayer)) {
+      // On bloque le mouvement
+      return;
+    }
+
+    // Sinon on applique le mouvement
+    p.x = newX;
+    p.y = newY;
+
+    // Collision avec un gâteau
     this.checkCollision(p);
 
+    // Mise à jour du jeu
     this.server.emit('gameState', {
       players: this.players,
       cakes: this.cakes,
     });
   }
+
 
 
   // CAKES
@@ -214,28 +282,37 @@ export class DemoGateway {
     return this.players.filter(p => p.score === maxScore);
   }
 
+  @SubscribeMessage('pauseGame')
+  handlePauseGame(@ConnectedSocket() socket: Socket) {
+    if (!this.gameStarted) return;
+
+    const player = this.players.find(p => p.socketId === socket.id);
+    if (!player) return;
+
+    clearInterval(this.timer);
+
+    this.server.emit("gamePaused", {
+      by: player.username
+    });
+  }
+
+  @SubscribeMessage('resumeGame')
+  handleResumeGame(@ConnectedSocket() socket: Socket) {
+    if (!this.gameStarted) return;
+
+    // Relancer le timer
+    this.timer = setInterval(() => {
+      this.timeLeft--;
+      this.server.emit("timeLeft", this.timeLeft);
+
+      if (this.timeLeft <= 0) this.endGame();
+    }, 1000);
+
+    // 🔥 IMPORTANT : broadcast à TOUS les joueurs
+    this.server.emit("gameResumed");
+  }
 
 
-  // private async saveRecord(player: Player): Promise<boolean> {
-  //   const recordList = await this.recordService.findAll();
-  //   console.log("RecordList:", recordList);
-
-  //   // Aucun record en base
-  //   if (recordList.length === 0) {
-  //     return true;
-  //   }
-
-  //   // Trier pour être sûr de prendre le meilleur
-  //   const bestRecord = recordList[0];
-  //   console.log("BestRecord:", bestRecord);
-
-  //   // Nouveau record battu
-  //   if (player.score > bestRecord.score) {
-  //     return true;
-  //   }
-
-  //   return false;
-  // }
 
   private isColorTaken(color: string): boolean {
     return this.players.some(p => p.color === color);
