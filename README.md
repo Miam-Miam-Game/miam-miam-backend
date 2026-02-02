@@ -1,4 +1,17 @@
 <p align="center">
+  <img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/github/actions/workflow/status/Miam-Miam-Game/miam-miam-backend/tests.yml?branch=main&label=Tests" />
+  <img src="https://img.shields.io/codecov/c/github/Miam-Miam-Game/miam-miam-backend?label=Coverage" />
+  <img src="https://img.shields.io/badge/NestJS-Backend-red?logo=nestjs" />
+  <img src="https://img.shields.io/badge/Node.js-18+-green?logo=node.js" />
+  <img src="https://img.shields.io/github/license/Miam-Miam-Game/miam-miam-backend" />
+</p>
+
+
+<p align="center">
   <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
 </p>
 
