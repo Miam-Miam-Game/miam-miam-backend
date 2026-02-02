@@ -12,6 +12,7 @@ import { Record } from '../record/entities/record.entity';
 
 const MAX_PLAYERS = 3;
 const GAME_DURATION = 90;
+
 const COUNTDOWN = 5;
 const COLORS = ['red', 'blue', 'green'];
 
@@ -28,6 +29,8 @@ interface Player {
 @WebSocketGateway({
   cors: { origin: '*' },
 })
+
+
 export class DemoGateway {
   @WebSocketServer()
   server: Server;
