@@ -11,7 +11,7 @@ import { RecordService }  from '../record/record.service';
 import { Record } from '../record/entities/record.entity';
 
 const MAX_PLAYERS = 3;
-const GAME_DURATION = 90;
+const GAME_DURATION = 10;
 
 const COUNTDOWN = 5;
 const COLORS = ['red', 'blue', 'green'];
